@@ -1,0 +1,22 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+#0.1 Set working directory
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+
+library(dada2)
+library(tidyverse)
+kptSilva138dfPlastid <-read_csv('Chloroplast.csv')
+kptSilva138df = subset(kptSilva138dfPlastid, select = c(ASV))
+kptSilva138df <- distinct(kptSilva138df)
+
+kpPlastid <- assignTaxonomy(seqs=kptSilva138df$ASV, refFasta = 'pr2_version_4.12.0_16S_dada2.fasta',  tryRC = T, outputBootstraps = T, minBoot = 50, multithread = T)
+kpPlastiddf<-as.data.frame(kpPlastid)
+kpPlastiddf$asv<-rownames(kpPlastiddf)
+write_csv(kpPlastiddf,'PR2tax.csv')
+```
+

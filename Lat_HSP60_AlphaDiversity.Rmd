@@ -1,0 +1,183 @@
+---
+title: "Lat_HSP60_Phyloseqobj"
+author: "Nathan"
+date: "04/08/2021"
+---
+```{r libraries}
+library("phyloseq")
+library("vegan")
+library("ggplot2")
+library("dplyr")
+library("ape")
+library("tidyverse")
+library("tidyr")
+```
+
+```{r pw.adonis}
+source('~/Dropbox/UTS/PhD/Projects/Chapter2_RoseBay/Data_Analysis/16S/Scripts/Pairwise.Adonis.r')
+```
+
+```{r Load in Data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+sample_data <- read_csv('SMD.csv')
+HSP60_data_long <- read_csv("HSP60_Normalised_long.csv")
+```
+
+```{r Nathan Theme}
+NathanTheme <- list(   #scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+```
+
+```{r Filter Data}
+sample_data <- sample_data %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+HSP60_data_long <- HSP60_data_long %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+```
+
+```{r Make data frames appropriate for Phyloseq}
+abund.vars <- c('Species', 'SampleID', "RA")
+Abundance <- HSP60_data_long %>% select(abund.vars) %>% distinct()
+Abundance.spread <- Abundance %>% spread(key='SampleID', value='RA', fill=0)
+
+taxonomy.vars <- c('Genus', 'Species')
+taxonomy <- HSP60_data_long %>% select(taxonomy.vars) %>% distinct()
+
+#Make the phyloseq obj
+OTU = otu_table(Abundance.spread[2:ncol(Abundance.spread)], taxa_are_rows = TRUE)
+TAX = tax_table(taxonomy)
+
+#Sample_Data
+sample.vars <- c("SampleID","Location","mycl220","mycl450","mycl700","Koppen_classification","Type","Latitude")
+vars <- sample_data[sample.vars]
+vars <- distinct(vars)
+rownames(vars) <- vars$SampleID
+sampledata = sample_data(data.frame(vars))
+sampledata
+sam_data <- sampledata
+```
+
+```{r Phyloseq object}
+physeq = phyloseq(OTU, TAX, sam_data)
+```
+
+```{r Export if you please}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+saveRDS(physeq, 'physeq.RDS')
+```
+
+```{R Subset phyloseq object}
+Beach <- subset_samples(physeq, Type == "Beach",)
+River <- subset_samples(physeq, Type == "River")
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Shannon by Location}
+All.Richness_Shannon <- estimate_richness(physeq, split = TRUE, measures = c("Shannon"))
+All.Adonis.Shannon <- adonis(All.Richness_Shannon ~ sample_data(physeq)$Location, p.adjust.m = "bonferroni")
+All.Adonis.Shannon
+All.pwAdonis.Shannon <- pairwise.adonis(All.Richness_Shannon, sample_data(physeq)$Location, p.adjust.m = "bonferroni")
+All.pwAdonis.Shannon
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Shannon}
+Koppen_classificationPlot <- plot_richness(physeq, x="Latitude", color = "Location", measures=c("Shannon")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot
+
+All.Richness_Koppen_Shannon <- estimate_richness(physeq2, split = TRUE, measures = c("Shannon"))
+All.pwAdonis.Shannon <- pairwise.adonis(All.Richness_Koppen_Shannon, sample_data(physeq2)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Shannon
+All.Richness_Koppen_Shannon_df <- as.data.frame(All.Richness_Koppen_Shannon)
+All.Richness_Koppen_Shannon_df <- All.Richness_Koppen_Shannon_df %>% rownames_to_column("SampleID") %>% merge(sample_data, by = "SampleID")
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Chao1}
+Koppen_classificationPlot <- plot_richness(physeq2, x="Latitude", color = "Koppen_classification", measures=c("Chao1")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot
+
+All.Richness_Koppen_Chao1 <- estimate_richness(physeq2, split = TRUE, measures = c("Chao1"))
+All.pwAdonis.Chao1 <- pairwise.adonis(All.Richness_Koppen_Chao1, sample_data(physeq2)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Chao1
+All.Richness_Koppen_Chao1_df <- as.data.frame(All.Richness_Koppen_Chao1)
+All.Richness_Koppen_Chao1_df <- All.Richness_Koppen_Chao1_df %>% rownames_to_column("SampleID") %>% merge(sample_data, by = "SampleID")
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Simpson}
+Koppen_classificationPlot <- plot_richness(physeq2, x="Latitude", color = "Koppen_classification", measures=c("Simpson")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot
+
+All.Richness_Koppen_Simpson <- estimate_richness(physeq2, split = TRUE, measures = c("Simpson"))
+All.pwAdonis.Simpson <- pairwise.adonis(All.Richness_Koppen_Simpson, sample_data(physeq2)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Simpson
+All.Richness_Koppen_Simpson_df <- as.data.frame(All.Richness_Koppen_Simpson)
+All.Richness_Koppen_Simpson_df <- All.Richness_Koppen_Simpson_df %>% rownames_to_column("SampleID") %>% merge(sample_data, by = "SampleID")
+```
+
+```{r export to csv}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+write.csv(All.Richness_Koppen_Simpson_df, "All.Richness_Koppen_Simpson_df.csv")
+write.csv(All.Richness_Koppen_Chao1_df, "All.Richness_Koppen_Chao1_df.csv")
+write.csv(All.Richness_Koppen_Shannon_df, "All.Richness_Koppen_Shannon_df.csv")
+```
+
+Beach sites only
+
+```{R Alpha Diversity - All.Richness_Koppen_Shannon}
+Koppen_classificationPlot_Beach <- plot_richness(Beach, x="Latitude", color = "Koppen_classification", measures=c("Shannon")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_Beach
+
+All.Richness_Koppen_Shannon_Beach <- estimate_richness(Beach, split = TRUE, measures = c("Shannon"))
+All.pwAdonis.Shannon_Beach <- pairwise.adonis(All.Richness_Koppen_Shannon_Beach, sample_data(Beach)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Shannon_Beach
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Chao1}
+Koppen_classificationPlot_Beach <- plot_richness(Beach, x="Latitude", color = "Koppen_classification", measures=c("Chao1")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_Beach
+
+All.Richness_Koppen_Chao1_Beach <- estimate_richness(Beach, split = TRUE, measures = c("Chao1"))
+All.pwAdonis.Chao1_Beach <- pairwise.adonis(All.Richness_Koppen_Chao1_Beach, sample_data(Beach)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Chao1_Beach
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Simpson}
+Koppen_classificationPlot_Beach <- plot_richness(Beach, x="Latitude", color = "Koppen_classification", measures=c("Simpson")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_Beach
+
+All.Richness_Koppen_Simpson_Beach <- estimate_richness(Beach, split = TRUE, measures = c("Simpson"))
+All.pwAdonis.Simpson_Beach <- pairwise.adonis(All.Richness_Koppen_Simpson_Beach, sample_data(Beach)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Simpson_Beach
+```
+
+River Sites Only
+
+```{R Alpha Diversity - All.Richness_Koppen_Shannon}
+Koppen_classificationPlot_River <- plot_richness(River, x="Latitude", color = "Koppen_classification", measures=c("Shannon")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_River
+
+All.Richness_Koppen_Shannon_River <- estimate_richness(River, split = TRUE, measures = c("Shannon"))
+All.pwAdonis.Shannon_River <- pairwise.adonis(All.Richness_Koppen_Shannon_River, sample_data(River)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Shannon_River
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Chao1}
+Koppen_classificationPlot_River <- plot_richness(River, x="Latitude", color = "Koppen_classification", measures=c("Chao1")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_River
+
+All.Richness_Koppen_Chao1_River <- estimate_richness(River, split = TRUE, measures = c("Chao1"))
+All.pwAdonis.Chao1_River <- pairwise.adonis(All.Richness_Koppen_Chao1_River, sample_data(River)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Chao1_River
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Simpson}
+Koppen_classificationPlot_River <- plot_richness(River, x="Latitude", color = "Koppen_classification", measures=c("Simpson")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_River
+
+All.Richness_Koppen_Simpson_River <- estimate_richness(River, split = TRUE, measures = c("Simpson"))
+All.pwAdonis.Simpson_River <- pairwise.adonis(All.Richness_Koppen_Simpson_River, sample_data(River)$Koppen_classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Simpson_River
+```

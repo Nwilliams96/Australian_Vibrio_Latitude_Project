@@ -1,0 +1,46 @@
+---
+title: "Lat_HSP60_ArrangeData"
+author: "Nathan"
+date: "04/08/2021"
+---
+
+```{r Load Data}
+library("tidyr")
+library("tidyverse")
+library("dplyr")
+
+#0.1 Set working directory
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+
+#1.0 Load and prepare your asv_data file (this is called otu_data in the tutorial)
+
+#1.1 load in the data
+HSP60_data <- read_csv("SampleID_L7.csv")
+sample_data <- read_csv("SMD.csv")
+sample_data <- sample_data %>%  arrange(sample_data$SampleID)
+```
+
+```{r }
+#1.2 Make the long version of your data
+HSP60_data_long <- gather(data = HSP60_data, key = SampleID, value = Abundance, -c(1,2))
+
+#1.3 Left join in your meta data
+HSP60_data_long <- HSP60_data_long %>% left_join(sample_data)
+
+HSP60 <- HSP60_data_long
+
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60")
+write_csv(HSP60,'HSP60.csv')
+```
+
+```{r }
+HSP60_Normalised_long <- HSP60_data_long %>% unite('Species.SampleID', c(Species, SampleID), remove=F, sep='_')
+HSP60_Normalised_long <- HSP60_Normalised_long %>% group_by(SampleID) %>% mutate(Total_Abundance = sum(Abundance))
+HSP60_Normalised_long <- HSP60_Normalised_long %>% group_by(SampleID) %>% mutate(RA = (Abundance/Total_Abundance)*100)
+check                 <- HSP60_Normalised_long %>% group_by(SampleID) %>% summarise(Check=sum(RA))
+```
+
+```{r Write CSV}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+write_csv(HSP60_Normalised_long, "HSP60_Normalised_long.csv")
+```

@@ -1,0 +1,92 @@
+---
+title: "Lat_HSP60_SIMPROF"
+author: "Nathan"
+date: "04/08/2021"
+---
+```{r Libraries}
+library("tidyr")
+library("tidyverse")
+library("dplyr")
+library("clustsig")
+```
+
+```{r SIMPROF setup}
+#0.1 Set working directory
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60")
+HSP60 <- read_csv("HSP60.csv")
+sample_data <- read_csv("SMD.csv")
+
+HSP60_subset <- HSP60 %>% group_by(Species,Location) %>% mutate(RA.Average = mean(Abundance)) %>% distinct(Location, .keep_all=TRUE)
+
+HSP60_subset <- HSP60_subset %>% unite('Location.D.S', c(Location, SampleID), remove=F, sep=';')
+Ldata <- HSP60_subset %>% dplyr::select(Location,Species,RA.Average)
+Ldata <- Ldata %>% spread(key='Species', value='RA.Average', fill=0)
+
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60")
+write_csv(Ldata,'Ldata_SIMPROF.csv')
+```
+
+```{bash - Setup for R on HPC}
+screen -S HSP60.SIMPROF
+qsub -I -q c3b -l ncpus=11,mem=100GB,walltime=48:00:00 
+#or 
+qsub -I -l ncpus=11,mem=300GB,walltime=48:00:00
+cd /shared/c3/projects/Nathan.Williams.12034652/Vibrio_Latitude_Project/Vibrio_Latitude_HSP60/SIMPROF
+module load devel/R-current;
+R
+```
+
+```{R - Run on the HPC}
+# RUN ON HPC
+#setwd("~/Dropbox/UTS/PhD/Projects/Vibrio_latitude_study/Data/HSP60/Run 2/Data Analysis")
+#Ldata <- read_csv("Ldata_SIMPROF.csv")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60")
+library("vegan")
+library("ggplot2")
+library("dplyr")
+library("tidyverse")
+library("tidyr")
+library("clustsig")
+
+Ldata <- read_csv("Ldata_SIMPROF.csv")
+
+L.matrix <-  as.matrix(Ldata[,-c(1)])
+rownames(L.matrix) <- Ldata$Location
+L.matrix.nz <- L.matrix[,colSums(L.matrix)!=0]
+```
+
+```{r}
+L_simprof <- simprof(L.matrix.nz, num.expected=100, num.simulated=999, method.cluster="ward.D", method.distance="braycurtis", alpha=0.05, sample.orientation="row", undef.zero=TRUE, silent = FALSE, increment=5);
+saveRDS(L_simprof, 'L_simprof.RDS')
+```
+
+```{R Analyse SIMPROF}
+#load the simprof RDS file
+library("clustsig")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60")
+L_simprof <- readRDS("L_simprof.RDS")
+```
+
+```{r SIMPROF }
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60")
+sample_data <- read_csv('SMD.csv')
+Ldata <- read_csv("Ldata_SIMPROF.csv")
+simprof.plot(L_simprof)
+abline(h=220) ## to draw a line at a specific height and see how many group that gives
+```
+
+```{r export}
+names(L_simprof)
+mycl220 <-cutree(L_simprof$hclust, h=220)
+mycl450 <-cutree(L_simprof$hclust, h=450)
+mycl700 <-cutree(L_simprof$hclust, h=700)
+myclusters <- as.data.frame(cbind(mycl220=mycl220, mycl450=mycl450, mycl700=mycl700))
+myclusters <- myclusters %>% rownames_to_column("Location.D.S")
+sample_data <- sample_data %>% unite('Location.D.S', c(Location,SampleID), remove=F, sep=';')
+sample_data <- sample_data %>% left_join(myclusters)
+sample_data$mycl220 <- as.character(sample_data$mycl220)
+sample_data$mycl450 <- as.character(sample_data$mycl450)
+sample_data$mycl700 <- as.character(sample_data$mycl700)
+
+write_csv(sample_data,'SMD.csv')
+```

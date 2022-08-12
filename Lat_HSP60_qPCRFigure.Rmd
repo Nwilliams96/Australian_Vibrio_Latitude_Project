@@ -1,0 +1,57 @@
+---
+title: "Lat_HSP60_qPCRFigure"
+author: "Nathan"
+date: "04/08/2021"
+---
+
+```{r Libraries}
+library("tidyr")
+library("tidyverse")
+library("dplyr")
+library("ggplot2")
+```
+
+```{r Nathan Theme} 
+NathanTheme = list(    scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+```
+
+```{r Load Data}
+#0.1 Set working directory
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+HSP60_data_long <- read_csv("HSP60_data_long.csv")
+sample_data <- read_csv("SMD.csv")
+```
+
+```{r Calculate the RA by dividing FGID.Location/ASVs per location *100}
+HSP60_data_long <- HSP60_data_long %>% mutate(RAqpcr = (Total.Vibrio.Species.Location/Total.Vibrio.Location)*Vibrio_qPCRA)
+
+qPCR <- HSP60_data_long %>% distinct(Location, .keep_all = TRUE)
+```
+
+```{r Plot Vibrio qPCR}
+VibrioqPCR <- qPCR %>% ggplot(aes(x=Location, y=Vibrio_qPCRA)) + 
+  geom_bar(stat='identity') +
+  labs( x= 'Location', y= 'Average Copies/L') +
+  scale_y_continuous(trans = 'log10') +
+  NathanTheme
+VibrioqPCR
+```
+
+```{Plot HSP60}
+HSP60RA <- HSP60_data_long %>% ggplot(aes(x=Location, y=RA, fill=(GS))) + 
+  geom_bar(stat='identity') +
+  #scale_fill_manual(values = c(C100)) +
+  labs( x= 'Location', y= 'Relative Abundance') +
+  NathanTheme
+HSP60RA
+```
+
+

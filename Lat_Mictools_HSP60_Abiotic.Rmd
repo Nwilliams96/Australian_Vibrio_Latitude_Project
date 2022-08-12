@@ -1,0 +1,174 @@
+---
+title: "Lat_Mictools"
+Author: "Nathan Williams"
+Date: "18/8/21"
+Project: "Latitude"
+---
+```{r Load Libraries}
+library("dplyr")
+library("tidyverse")
+```
+
+```{r Load in Data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+HSP60 <- read_csv("HSP60.MIC.csv")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Statistics_Output")
+
+```
+
+```{r prepare for mictools}
+Abundance <- HSP60 %>% dplyr::select(Species, SampleID, Abundance) %>% distinct()
+Abundance.spread <- Abundance %>% spread(key='SampleID', value='Abundance', fill=0)
+L.matrix.simper <-  as.matrix(Abundance.spread[,-c(1)])
+rownames(L.matrix.simper) <- Abundance.spread$Species
+L.matrix.simper.t <- t(L.matrix.simper)
+L.matrix.nz <- L.matrix.simper.t[,colSums(L.matrix.simper.t)!=0]
+L.matrix.nz <- as.data.frame(L.matrix.nz)
+L.matrix.nz <- tibble::rownames_to_column(L.matrix.nz, "SampleID")
+Mictools.dataframe <- L.matrix.nz
+```
+
+```{r write Mictools.dataframe}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+write_tsv(Mictools.dataframe, "Mictools.dataframe.HSP60.Abiotic.txt")
+```
+
+```{bash}
+screen -S MicTools.Ind.Species
+
+qsub -I -q c3b -l ncpus=11,mem=188GB,walltime=48:00:00
+
+cd /shared/c3/projects/Nathan.Williams.12034652/Vibrio_Latitude_Project/MicTools/Run2
+
+module load devel/c8/python-3.8.3
+```
+
+```{bash}
+mictools null Mictools.dataframe.HSP60.Abiotic.txt null_dist.txt
+ 
+mictools pval Mictools.dataframe.HSP60.Abiotic.txt null_dist.txt Results/
+ 
+mictools adjust Results/pval.txt Results/
+ 
+mictools strength Mictools.dataframe.HSP60.Abiotic.txt Results/pval.txt Mictools.Results.txt
+```
+
+```{r Load data in and analyse}
+library("dplyr")
+library("tidyverse")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Statistics_Output/")
+Correlations <- read_tsv("Mictools.Results.txt")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data/")
+Species <- read_csv("Species_List.csv")
+```
+
+```{r }
+Correlations.Filtered <- Correlations %>% filter(!TICePVal > 0.01)
+#Correlations.Filtered <- Correlations.Filtered %>% filter(!SpearmanRho > 0.05)
+```
+
+```{r Network Visulisation - packages}
+#setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Statistics_Output")
+#write_csv(Vibrio.correlations, "Vibrio.Correlations.csv")
+```
+
+```{r Mictools Analysis - Vibrio Parahaemolyticus}
+Temperature1 <- Correlations.Filtered %>% filter(Var1 == "Temperature")
+Temperature2 <- Correlations.Filtered %>% filter(Var2 == "Temperature")
+Temperature <- rbind(Temperature1,Temperature2)
+Temperature <- Temperature %>% dplyr::select(Var1,PearsonR)
+Temperature <- rename(Temperature, Temperature_R = PearsonR)
+Temperature <- rename(Temperature, Species = Var1)
+```
+
+```{r Mictools Analysis - Salinity}
+Salinity1 <- Correlations.Filtered %>% filter(Var1 == "Salinity ppt")
+Salinity2 <- Correlations.Filtered %>% filter(Var2 == "Salinity ppt")
+Salinity <- rbind(Salinity1,Salinity2)
+Salinity <- Salinity %>% dplyr::select(Var1,PearsonR)
+Salinity <- rename(Salinity, Salinity_R = PearsonR)
+Salinity <- rename(Salinity, Species = Var1)
+```
+
+```{r Mictools Analysis - DO}
+DO1 <- Correlations.Filtered %>% filter(Var1 == "DO")
+DO2 <- Correlations.Filtered %>% filter(Var2 == "DO")
+DO <- rbind(DO1,DO2)
+DO <- DO %>% dplyr::select(Var1,PearsonR)
+DO <- rename(DO, DO_R = PearsonR)
+DO <- rename(DO, Species = Var1)
+```
+
+```{r Mictools Analysis - Latitude}
+Latitude1 <- Correlations.Filtered %>% filter(Var1 == "Latitude")
+Latitude2 <- Correlations.Filtered %>% filter(Var2 == "Latitude")
+Latitude <- rbind(Latitude1,Latitude2)
+Latitude <- Latitude %>% dplyr::select(Var1,PearsonR)
+Latitude <- rename(Latitude, Latitude_R = PearsonR)
+Latitude <- rename(Latitude, Species = Var1)
+```
+
+```{r Mictools Analysis - pH}
+pH1 <- Correlations.Filtered %>% filter(Var1 == "pH")
+pH2 <- Correlations.Filtered %>% filter(Var2 == "pH")
+pH <- rbind(pH1,pH2)
+pH <- pH %>% dplyr::select(Var1,PearsonR)
+pH <- rename(pH, pH_R = PearsonR)
+pH <- rename(pH, Species = Var1)
+```
+
+```{r Combine data}
+Correlations_Combined <- Species %>% left_join(Temperature)
+Correlations_Combined <- Correlations_Combined %>% left_join(Salinity)
+Correlations_Combined <- Correlations_Combined %>% left_join(pH)
+Correlations_Combined <- Correlations_Combined %>% left_join(DO)
+Correlations_Combined <- Correlations_Combined %>% left_join(Latitude)
+```
+
+```{r export}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Statistics_Output/")
+write_csv(Correlations_Combined, "Correlations_Combined.csv")
+```
+
+```{r Create long version of data}
+Correlations_Long <- gather(data = Correlations_Combined, key = Variable, value = Rvalue, -c(1))
+```
+
+```{r Import Data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Statistics_Output/")
+Correlations_Long <- read_csv('Correlations_Long.csv')
+```
+
+```{r Theme}
+Theme <- 
+  theme(plot.title = element_blank()) +
+  theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 15)) +
+  theme(axis.title.y = element_text(vjust = 0, hjust = 0.5, size = 15)) +
+  theme(axis.text=element_text(size=10)) +
+  #theme(legend.title = element_text("Copy.number"))
+  theme(axis.text.x = element_text(hjust=1, vjust = 0.5, size = 17, angle = 90)) +
+  theme(axis.text.y = element_text(hjust=1, size = 17, angle = 0)) +
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+        panel.background = element_blank(),panel.grid.minor = element_blank(), 
+        axis.line = element_blank())
+
+Species <- c("alfacsensis",	"alginolyticus",	"algivorus",	"antiquarius",	"azureus",	"barjaei",	"bivalvicida",	"brasiliensis",	"campbellii",	"caribbeanicus",	"chagasii",	"coralliilyticus",	"coralliirubri",	"crassostreae",	"cyclitrophicus",	"diabolicus",	"fluvialis",	"fortis",	"furnissii",	"gigantis",	"halioticoli",	"hangzhouensis",	"harveyi",	"hepatarius",	"ichthyoenteri",	"ishigakensis",	"jasicida",	"lentus",	"mangrovi",	"marisflavi",	"maritimus",	"mediterranei",	"mexicanus",	"mimicus",	"natriegens",	"navarrensis",	"neptunius",	"nigripulchritudo",	"orientalis",	"owensii",	"panuliri",	"parahaemolyticus",	"pectenicida",	"penaeicida",	"ponticus",	"rhodolitus",	"rotiferianus",	"scophthalmi",	"shilonii",	"sinaloensis",	"sonorensis",	"splendidus",	"thalassae",	"tubiashii",	"variabilis",	"vulnificus",	"xiamenensis",	"xuii")
+
+Species <- rev(Species)
+
+```
+
+```{r Heatmap}
+Correlations_HM <- ggplot(data = Correlations_Long, mapping = aes(x = Species, y = Variable, fill = Rvalue))+
+  geom_tile() +
+  Theme +
+  xlab(label = "") +
+  ylab(label = "") +
+  scale_fill_gradient2(high = "#d20f0f",mid = "#ffd603",low = "#0185b9",space = "Lab",na.value = "white",guide = "colourbar",aesthetics = "fill") +
+  coord_flip() +
+  scale_x_discrete(limits = c(Species))
+
+
+Correlations_HM
+
+```

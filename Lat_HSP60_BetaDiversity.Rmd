@@ -1,0 +1,192 @@
+---
+title: "Lat_HSP60_BetaDiversity"
+author: "Nathan"
+date: "04/08/2021"
+
+---
+
+```{r Libraries}
+library("phyloseq")
+library("vegan")
+library("ggplot2")
+library("dplyr")
+library("ape")
+library("tidyverse")
+library("tidyr")
+
+source('~/Dropbox/UTS/PhD/Projects/Chapter2_RoseBay/Data_Analysis/16S/Scripts/Pairwise.Adonis.r')
+```
+
+```{r Nathan Theme}
+NathanTheme <- list(   #scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+```
+
+```{r Load in Data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+sample_data <- read_csv('SMD.csv')
+HSP60_data_long <- read_csv("HSP60_Normalised_long.csv")
+```
+
+```{r Check}
+Check <- HSP60_data_long %>% distinct(SampleID, .keep_all = FALSE)
+```
+
+```{r Filter Data}
+sample_data <- sample_data %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+HSP60_data_long <- HSP60_data_long %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+```
+
+```{r Species Calculations}
+Average_Species <- HSP60_data_long %>% group_by(Species) %>% summarise(Average_RA = mean(RA))
+Campbellii <- HSP60_data_long %>% filter(Species == ("campbellii")) %>% select(Location,Species,Abundance)
+Harveyi <- HSP60_data_long %>% filter(Species == ("harveyi")) %>% select(Location,Species,Abundance)
+```
+
+```{r NMDS Data preparation}
+library(tidyverse)
+library(vegan)
+library(dplyr)
+library(reshape2)
+HSP60_subset <- HSP60_data_long %>% dplyr::select(Species, RA, SampleID)
+HSP60_subset <- HSP60_subset %>% filter(!RA ==0)
+HSP60.wide.OFG <- reshape2::dcast(HSP60_subset , SampleID~Species, value.var = "RA", fill=0)
+rownames(HSP60.wide.OFG) <- HSP60.wide.OFG$SampleID
+HSP60_nmds_df <- HSP60.wide.OFG [,-c(1)]
+```
+
+```{r NMDS}
+HSP60.nMDS <- metaMDS(HSP60_nmds_df, distance = "bray", try =99, trymax=100, autotransform = F)
+#stressplot(Rarefied30K.nMDS)
+#plot(Rarefied30K.nMDS)
+names(HSP60.nMDS)
+HSP60.nMDS.points <- cbind(HSP60.wide.OFG[,c(1)], as.data.frame(HSP60.nMDS$points))
+colnames(HSP60.nMDS.points)[1] <- "SampleID"
+HSP60.nMDS.points <-HSP60.nMDS.points %>% mutate(code=as.character(SampleID)) %>% left_join(sample_data)
+HSP60.nMDS.points$mycl220 <- as.character(HSP60.nMDS.points$mycl220)
+HSP60.nMDS.points$mycl450 <- as.character(HSP60.nMDS.points$mycl450)
+```
+
+```{r MDS}
+library(tidyverse)
+MDS.HSP60 <- ggplot(HSP60.nMDS.points, aes(x=MDS1, y=MDS2, color = Location)) + 
+  geom_point(aes(size=0.4)) +
+  #geom_text(aes(label = Location),hjust=0, vjust=0) +
+  #scale_colour_manual(values=c("2"="#4ecdff", "1"="#d44f49" , "3"="#64c49b","4" = "#fdb987")) +
+  NathanTheme
+MDS.HSP60
+```
+
+```{r Test 1 Koppen Classification Pairwise Adonis}
+Test1.Adonis_df <- HSP60.wide.OFG %>% left_join(sample_data)
+Test1.Adonis_matrix <- as.matrix(Test1.Adonis_df[,-c(1,60:76)])
+rownames(Test1.Adonis_matrix) <- Test1.Adonis_df$SampleID
+Test1.pwAdonis <- pairwise.adonis(Test1.Adonis_matrix, Test1.Adonis_df$Koppen_classification, p.adjust.m = "bonferroni")
+Test1.Adonis <- adonis(Test1.Adonis_matrix ~ Test1.Adonis_df$Koppen_classification, p.adjust.m = "bonferroni")
+summary.pwadonis(Test1.Adonis)
+```
+
+```{r Test 2 Location Pairwise Adonis}
+Test2.Adonis_df <- HSP60.wide.OFG %>% left_join(sample_data)
+Test2.Adonis_matrix <- as.matrix(Test2.Adonis_df[,-c(1,60:76)])
+rownames(Test2.Adonis_matrix) <- Test2.Adonis_df$SampleID
+Test2.pwAdonis <- pairwise.adonis(Test2.Adonis_matrix, Test1.Adonis_df$Location, p.adjust.m = "bonferroni")
+Test2.Adonis <- adonis(Test2.Adonis_matrix ~ Test2.Adonis_df$Location, p.adjust.m = "bonferroni")
+Test2.pwAdonis
+Test2.Adonis
+```
+
+```{r Test 3 River v Beach Pairwise Adonis}
+Test3.pwAdonis <- pairwise.adonis(Test1.Adonis_matrix, Test1.Adonis_df$Type, p.adjust.m = "bonferroni")
+Test3.Adonis <- adonis(Test1.Adonis_matrix ~ Test1.Adonis_df$Type, p.adjust.m = "bonferroni")
+summary.pwadonis(Test2.Adonis)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r Nine's method of adding in environemental variables}
+nmds_subset <- diatoms_surf %>% dplyr::select("sample", "uniqcode",  "day_length", "temperature_deg_c", "silicate_umol_per_l", "phosphate_umol_per_l", "nitrate_nitrite_umol_per_l", "ammonium_umol_per_l", "date_utc", "GID", "abund_rare", "RA.percent")
+
+# Square-root transform all the independent variables to normalise the environmental variables as they are express in different unit and thus not comparable (it is like comparing apple and pear)
+nmds_subset$day_length <- sqrt(nmds_subset$day_length)
+nmds_subset$temperature_deg_c <- sqrt(nmds_subset$temperature_deg_c)
+nmds_subset$silicate_umol_per_l <- sqrt(nmds_subset$silicate_umol_per_l)
+nmds_subset$phosphate_umol_per_l <- sqrt(nmds_subset$phosphate_umol_per_l)
+nmds_subset$nitrate_nitrite_umol_per_l <- sqrt(nmds_subset$nitrate_nitrite_umol_per_l)
+nmds_subset$ammonium_umol_per_l <- sqrt(nmds_subset$ammonium_umol_per_l)
+
+#File prep
+colnames(nmds_subset)
+
+nmds_spread2 <- nmds_subset %>% select("sample", "uniqcode",  "day_length", "temperature_deg_c", "silicate_umol_per_l", "phosphate_umol_per_l", "nitrate_nitrite_umol_per_l", "ammonium_umol_per_l", "GID", "abund_rare") %>% pivot_wider(names_from = GID, values_from = abund_rare, values_fill = 0)
+
+nmds_spread2_clean <- na.omit(nmds_spread2) # to remove all the rows with na, go from 684 rows to 389
+
+nmds_meta <- nmds_spread2_clean %>% select(c(1:8)) # to take out the environmental variables without any NA
+colnames(nmds_meta) <- c("sample", "uniqcode", "Daylength", "Temperature", "Silicate", "Phosphate", "Nitrate", "Ammonium")
+
+row.names(nmds_spread2_clean)<- nmds_spread2_clean$sample
+com <- nmds_spread2_clean %>% select(-c(1:8))
+
+com.matrix <- as.matrix(com)
+
+com.matrix.nz <- com.matrix[,colSums(com.matrix)!=0] 
+
+com.matrix.nz.sqrt <- sqrt(com.matrix.nz)
+
+NMDS <- metaMDS(com.matrix.nz.sqrt, distance = "bray", k = 2, try = 99, autotransform = F) 
+
+envfit <- envfit(NMDS, nmds_meta, permutation = 999, na.rm = TRUE)
+
+#Plot NMDS and envfit (to have a quick look)
+{plot(NMDS)
+plot(envfit)}
+
+## to extract the the sample coordinate 
+data.scores <- as.data.frame(scores(NMDS))
+data.scores$sample <- nmds_meta$sample
+data.scores$uniqcode <- nmds_meta$uniqcode
+
+## to extract 
+envfit_coord_cont <- as.data.frame(scores(envfit, "vectors")) * ordiArrowMul(envfit)
+envfit_coord_cat <- as.data.frame(scores(envfit, "factors")) * ordiArrowMul(envfit) ##null
+
+gg2 = ggplot(data = data.scores, aes(x = NMDS1, y = NMDS2)) + 
+     geom_point(data = data.scores, aes(colour = nmds_meta$uniqcode), size = 3, alpha = 0.5) + #shape = nmds_meta$uniqcode
+     geom_segment(aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2), 
+                  data = envfit_coord_cont, size =1, alpha = 0.5, colour = "grey30") +
+     #geom_point(data = envfit_coord_cat, aes(x = NMDS1, y = NMDS2), 
+       #shape = "diamond", size = 4, alpha = 0.6, colour = "navy") +
+     #geom_text(data = envfit_coord_cat, aes(x = NMDS1, y = NMDS2+0.04), 
+       #label = row.names(envfit_coord_cat), colour = "navy", fontface = "bold") + 
+     geom_text(data = envfit_coord_cont, aes(x = NMDS1, y = NMDS2), colour = "grey30", 
+       fontface = "bold", label = row.names(envfit_coord_cont)) + 
+     theme(axis.title = element_text(size = 10, face = "bold", colour = "grey30"), 
+       panel.background = element_blank(), panel.border = element_rect(fill = NA, colour = "grey30"), 
+       axis.ticks = element_blank(), axis.text = element_blank(), legend.key = element_blank(), 
+       legend.title = element_text(size = 10, face = "bold", colour = "grey30"), 
+       legend.text = element_text(size = 9, colour = "grey30")) + 
+     labs(colour = "NRS site")+
+     annotate("text", x = max(data.scores$NMDS1), y = max(data.scores$NMDS2), label = paste('Stress =', round(NMDS$stress,3)))
+
+```
+

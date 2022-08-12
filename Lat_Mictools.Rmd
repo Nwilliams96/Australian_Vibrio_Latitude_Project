@@ -1,0 +1,112 @@
+---
+title: "Lat_Mictools"
+Author: "Nathan Williams"
+Date: "18/8/21"
+Project: "Latitude"
+---
+```{r Load Libraries}
+library("dplyr")
+library("tidyverse")
+```
+
+```{r Load in Data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+asv_rarefied_long <- read_csv('asv_rarefy30k_long_chloroplasts.csv')
+sample_data <- read_csv("SMD.csv")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+HSP60 <- read_csv("HSP60.MIC.csv")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Statistics_Output")
+Vibrio.Correlations <- read_csv("Vibrio.Correlations.csv")
+```
+
+```{r Filter data you want to look at}
+Chloroplasts <- asv_rarefied_long %>% filter((Kingdom =="Eukaryota")) %>% dplyr::select(FGID, SampleID, Abundance_Vegan_Rarefied) %>% distinct() %>% rename(Species = FGID) %>% rename(Abundance = Abundance_Vegan_Rarefied)
+Vibrio.HSP60 <- HSP60 %>% dplyr::select(Species, SampleID, Abundance) %>% distinct()
+LetsDoIt <- rbind(Vibrio.HSP60,Chloroplasts)
+```
+
+```{r prepare for mictools}
+Abundance <- LetsDoIt %>% dplyr::select(Species, SampleID, Abundance) %>% distinct()
+Abundance.spread <- Abundance %>% spread(key='SampleID', value='Abundance', fill=0)
+rownames(sample_data) <- sample_data$SampleID
+L.matrix.simper <-  as.matrix(Abundance.spread[,-c(1)])
+rownames(L.matrix.simper) <- Abundance.spread$Species
+L.matrix.simper.t <- t(L.matrix.simper)
+L.matrix.nz <- L.matrix.simper.t[,colSums(L.matrix.simper.t)!=0]
+L.matrix.nz <- as.data.frame(L.matrix.nz)
+L.matrix.nz <- tibble::rownames_to_column(L.matrix.nz, "SampleID")
+Mictools.dataframe <- L.matrix.nz
+```
+
+```{r write Mictools.dataframe}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+write_tsv(Mictools.dataframe, "Mictools.dataframe.txt")
+```
+
+```{bash}
+screen -S MicTools.Ind.Species
+
+qsub -I -q c3b -l ncpus=11,mem=188GB,walltime=48:00:00
+
+cd /shared/c3/projects/Nathan.Williams.12034652/Vibrio_Latitude_Project/MicTools
+
+module load devel/c8/python-3.8.3
+```
+
+```{bash}
+mictools null Mictools.dataframe.txt null_dist.txt
+ 
+mictools pval Mictools.dataframe.txt null_dist.txt Results/
+ 
+mictools adjust Results/pval.txt Results/
+ 
+mictools strength Mictools.dataframe.txt Results/pval.txt Mictools.Results.txt
+```
+
+```{r Load data in and analyse}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Statistics_Output")
+Correlations <- read_tsv("Mictools.Results.txt")
+```
+
+```{r }
+Correlations.Filtered <- Correlations %>% filter(!TICePVal > 0.01)
+#Correlations.Filtered <- Correlations.Filtered %>% filter(!SpearmanRho > 0.05)
+```
+
+```{r Filter Data to just Vibrios}
+Vibrio <- HSP60 %>% select(Species) %>% distinct(Species, .keep_all = TRUE)
+Vibrio <- as.matrix(Vibrio)
+Vibrio.correlations1 <- filter(Correlations.Filtered, Var1 %in% Vibrio)
+Vibrio.correlations2 <- filter(Correlations.Filtered, Var2 %in% Vibrio)
+Vibrio.correlations <- rbind(Vibrio.correlations1, Vibrio.correlations2)
+Vibrio.correlations <- Vibrio.correlations %>% unite('Correlation', c(Var1,Var2), remove=F, sep='_') %>% distinct(Correlation, .keep_all = TRUE)
+```
+
+```{r Network Visulisation - packages}
+#setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Statistics_Output")
+#write_csv(Vibrio.correlations, "Vibrio.Correlations.csv")
+```
+
+```{r Mictools Analysis - Vibrio Parahaemolyticus}
+Parahaemolyticus1 <- Vibrio.Correlations %>% filter(Var1 == "parahaemolyticus")
+Parahaemolyticus2 <- Vibrio.Correlations %>% filter(Var2 == "parahaemolyticus")
+Parahaemolyticus <- rbind(Parahaemolyticus1,Parahaemolyticus2)
+```
+
+```{r Mictools Analysis - Vibrio vulnificus}
+vulnificus1 <- Vibrio.Correlations %>% filter(Var1 == "vulnificus")
+vulnificus2 <- Vibrio.Correlations %>% filter(Var2 == "vulnificus")
+vulnificus <- rbind(vulnificus1,vulnificus2)
+```
+
+```{r Mictools Analysis - Vibrio harveyi}
+harveyi1 <- Vibrio.Correlations %>% filter(Var1 == "harveyi")
+harveyi2 <- Vibrio.Correlations %>% filter(Var2 == "harveyi")
+harveyi <- rbind(harveyi1,harveyi2)
+```
+
+```{r Mictools Analysis - Vibrio campbelli}
+campbellii1 <- Vibrio.Correlations %>% filter(Var1 == "campbellii")
+campbellii2 <- Vibrio.Correlations %>% filter(Var2 == "campbellii")
+campbellii <- rbind(campbellii1,campbellii2)
+```

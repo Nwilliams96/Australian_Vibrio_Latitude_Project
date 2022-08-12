@@ -1,0 +1,122 @@
+---
+title: "Lat_SIMPROF"
+Date: 31.5.21
+Correspondance: nathanwilliams22@gmail.com
+---
+
+```{r}
+#Theme for plot
+NathanTheme <- list(   #scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+```
+
+```{r Load in the data}
+library("tidyverse")
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+sample_data <- read_csv('SMD.csv')
+asv_rarefy30k_long <- read_csv("asv_rarefy30k_long.csv")
+```
+
+```{r SIMPROF: Prepare Data}
+#Arrange data for SIMPROF
+asv_rarefy30k_long <- asv_rarefy30k_long %>% unite('Location.S', c(Location, SampleID), remove=F, sep=';')
+latdata <- asv_rarefy30k_long %>% select(Location.S,FGID,Abundance_Vegan_Rarefied)
+latdata <- latdata %>% spread(key='FGID', value='Abundance_Vegan_Rarefied', fill=0)
+```
+
+```{r write the csv}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+write_csv(latdata,'latdata_SIMPROF.csv')
+```
+
+```{bash - Ask for memory and load in latest version of R}
+qsub -I -q c3b -l ncpus=11,mem=375GB,walltime=48:00:00
+#or
+qsub -I -l ncpus=11,mem=375GB,walltime=48:00:00
+
+cd to your location where your file is
+cd /shared/c3/projects/Nathan.Williams.12034652/Vibrio_Latitude_Project/Vibrio_Latitude_16S_Rerun/fastq_and_analysis/SIMPROF
+module load devel/R-current;
+R
+```
+
+```{R SIMPROF: Run SIMPROF}
+# RUN ON HPC
+
+library("vegan")
+library("ggplot2")
+library("dplyr")
+library("tidyverse")
+library("tidyr")
+library("clustsig")
+
+latdata <- read_csv("latdata_SIMPROF.csv")
+
+lat.matrix <- latdata %>% remove_rownames %>% column_to_rownames(var="Location.S")
+lat.matrix <- as.matrix(lat.matrix)
+lat.matrix.t <- t(lat.matrix)
+lat.matrix.nz <- lat.matrix[,colSums(lat.matrix)!=0]
+
+
+
+lat_simprof <- simprof(lat.matrix.nz, num.expected=100, num.simulated=999, method.cluster="ward.D", method.distance="braycurtis", alpha=0.05, sample.orientation="row", undef.zero=TRUE, silent = FALSE, increment=5);
+saveRDS(lat_simprof, 'lat_simprof.RDS.run2')
+```
+
+```{r SIMPROF: Load dataset}
+#load the simprof RDS file
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+lat_simprof <- readRDS("lat_simprof.RDS")
+```
+
+```{r SIMPROF: Figure}
+library("clustsig")
+#pdf(file="simprof.pdf")
+simprof.plot(lat_simprof) 
+abline(h=350)
+dev.off()
+```
+
+```{r SIMPROF: }
+names(lat_simprof)
+mycl450<-cutree(lat_simprof$hclust, h=450) #Two groups
+mycl400<-cutree(lat_simprof$hclust, h=400) #Three groups
+mycl350 <-cutree(lat_simprof$hclust, h=350) # Four groups
+```
+
+```{r SIMPROF: Make clusters a DF}
+myclusters <- as.data.frame(cbind(mycl450=mycl450, mycl400=mycl400, mycl350=mycl350))
+```
+
+```{r SIMPROF: Check how many samples are in the cluster}
+length(unique(mycl450))
+```
+
+```{r remove Cairns}
+sample_data <- sample_data %>% filter(!SampleID == "L88")
+sample_data <- sample_data %>% filter(!SampleID == "L89")
+sample_data <- sample_data %>% filter(!SampleID == "L90")
+```
+
+```{r}
+myclusters <- myclusters %>% rownames_to_column("Number")
+myclusters <- myclusters %>% rename(Location.D.S = FGID)
+sample_data <- sample_data %>% unite('Location.S', c(Location, SampleID), remove=F, sep=';')
+sample_data <- sample_data %>% left_join(myclusters)
+sample_data$mycl450 <- as.character(sample_data$mycl450)
+sample_data$mycl400 <- as.character(sample_data$mycl400)
+sample_data$mycl350 <- as.character(sample_data$mycl350)
+```
+
+```{r - write new sample data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+write_csv(sample_data,'SMD.csv')
+```
+

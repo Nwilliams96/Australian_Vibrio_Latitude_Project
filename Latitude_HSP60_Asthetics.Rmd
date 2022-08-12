@@ -1,0 +1,57 @@
+---
+title: "HSP60 Data"
+author: "Nathan"
+date: "15/10/2020"
+---
+
+```{r Libraries}
+library("tidyr")
+library("tidyverse")
+library("dplyr")
+library("ggplot2")
+```
+
+```{r Locations in order for the figures}
+locations <- c("Darwin B", "Darwin R","Cooktown B", "Cooktown R","Cairns B","Cairns R","Townsville B","Townsville R", "Mackay B", "Mackay R","Rockhampton B1","Rockhampton B2","Bundaberg R1","Bundaberg R2","Gold Coast B", "Gold Coast R", "Coffs Harbour B", "Coffs Harbour R", "Port Macquire B", "Port Macquire R", "Sydney B", "Sydney R","Jervis Bay B", "Jervis Bay R","Merimbala B", "Merimbala R", "Hobart B","Hobart R")
+```
+
+```{r}
+location_Replicates <- c("Darwin B_1","Darwin B_2","Darwin B_3","Darwin R_1","Darwin R_2","Darwin R_3","Cooktown B_1","Cooktown B_2","Cooktown B_3","Cooktown R_1","Cooktown R_2","Cooktown R_3","Cairns B_1","Cairns B_2","Cairns B_3","Cairns R_1","Cairns R_2","Cairns R_3","Townsville B_1","Townsville B_2","Townsville B_3","Townsville R_1", "Townsville R_2","Townsville R_3","Mackay B_1","Mackay B_2","Mackay B_3","Mackay R_1","Mackay R_2","Mackay R_3","Rockhampton B1_1","Rockhampton B1_2","Rockhampton B1_3","Rockhampton B2_1","Rockhampton B2_2","Rockhampton B2_3","Bundaberg R1_1","Bundaberg R1_2","Bundaberg R1_3","Bundaberg R2_1","Bundaberg R2_2","Bundaberg R2_3","Gold Coast B_1","Gold Coast B_2","Gold Coast B_3","Gold Coast R_1","Gold Coast R_2","Gold Coast R_3","Coffs Harbour R_1","Coffs Harbour R_2","Coffs Harbour R_3","Coffs Harbour B_1","Coffs Harbour B_2","Coffs Harbour B_3","Port Macquire B_1","Port Macquire B_2","Port Macquire B_3","Port Macquire R_1","Port Macquire R_2","Port Macquire R_3","Sydney R_1","Sydney R_2","Sydney R_3","Sydney B_1","Sydney B_2","Sydney B_3","Jervis Bay B_1","Jervis Bay B_2","Jervis Bay B_3","Jervis Bay R_1","Jervis Bay R_2","Jervis Bay R_3","Merimbala R_1","Merimbala R_2","Merimbala R_3","Merimbala B_1","Merimbala B_2","Merimbala B_3","Hobart B_1","Hobart B_2","Hobart B_3","Hobart R_1","Hobart R_2","Hobart R_3")
+```
+
+```{r #Different colours for the figures later}
+C11 <- c("#e6b8a3","#7dcee9","#ffbe90","#f49296","#78c179","#e7c6ff","#79b6b3","#f8e9ac","#ffa4d7","#b2bde8")
+
+C21 <- c("#cfd5b8","#eb90b5","#84f0ce","#fdbefe","#7fbd82","#63bbfa","#d5b871","#57efff","#f5968e","#94fff1","#e49a7e","#6bcfa9","#ffb6ba","#b2ecac","#bfd0ff","#dfdb8e","#9cd4ff","#ffc38e","#89b1ca","#d6f1a6","#caa0b5","#faffd7","#ffd8ef","#8ab694","#ffcfce","#a1b189","#dbffe9","#cea472","#b1d3c2","#ffe5ad")
+
+C30 <- c("#ffc7d4","#3eccc1","#ea95c3","#b6efae","#eaa0d8","#e2efa1","#95aef5","#c1bc71","#4bb7f1","#ffefaf","#bba0df","#a3b86f","#f5cdff","#8eb77a","#ffbde9","#6fba99", "#e4988d","#ffcec3","#5abab9","#c2a0c8","#c3ffd6","#bbc8ff","#a4b08a","#a7d1ff","#ffe1c3","#98fffd","#a8aac6","#a4ffe9","#eaffdc")
+  
+Top10Vibrios <- c("Vibrio campbellii","Vibrio Other","Vibrio harveyi","Vibrio rotiferianus","Vibrio azureus","Vibrio brasiliensis","Vibrio owensii","Vibrio parahaemolyticus","Vibrio fortis","Vibrio coralliirubri")
+```
+
+```{r themes}
+#Theme for plot
+NathanTheme = list(  scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+
+NathanTheme2 = list(   theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+
+```
+
+
+
+

@@ -1,0 +1,146 @@
+---
+title: "Indicator Species Analysis"
+Date: 31.5.21
+Correspondance: nathanwilliams22@gmail.com
+---
+
+```{bash}
+qsub -I -q c3b -l ncpus=11,mem=375GB,walltime=48:00:00
+#or
+qsub -I -l ncpus=11,mem=375GB,walltime=48:00:00
+
+cd /shared/c3/projects/Nathan.Williams.12034652/Vibrio_Latitude_Project/Vibrio_Latitude_16S_Rerun/fastq_and_analysis/Indicator_Species
+module load devel/R-current;
+R
+```
+
+```{r Theme}
+library("ggplot2")
+#Theme for plot
+NathanTheme <- list(   #scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 7, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+```
+
+```{r Data import}
+library("readr")
+library("tidyverse")
+library("tidyr")
+library("data.table")
+
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+asv_rarefy30k_long <- read_csv("asv_rarefy30k_long.csv")
+df <-asv_rarefy30k_long  %>% dplyr::select(FGID, Abundance_Vegan_Rarefied, SampleID) %>% distinct() %>% pivot_wider(names_from = FGID, values_from = Abundance_Vegan_Rarefied, values_fill = 0)
+sample_data <- read_csv('SMD.csv')
+```
+
+```{r Arrange data for Indicator Species Analysis}
+library("dplyr")
+#I added in sample metadata to the rarefied wide tables (with asv as the col name)
+pivot.meta  <- sample_data %>% dplyr::select(mycl450, SampleID) %>% left_join(df, 'SampleID')
+pivot.meta <- na.omit(pivot.meta)
+pivot.meta.mat <- as.matrix(pivot.meta[,-c(1,2)])
+head(pivot.meta.mat)
+#pivot.meta.mat2<-pivot.meta.mat[1:618,1:1000]
+rownames(pivot.meta.mat) <- pivot.meta$SampleID;
+pivot.meta.mat[1:10,1:10]
+```
+
+```{r Run the indicator species test}
+library("indicspecies")
+Indicator.Species = multipatt(pivot.meta.mat, as.factor(pivot.meta$mycl450), print.perm = TRUE, control = how(nperm=999));
+saveRDS(Indicator.Species , 'Indicator.Species.RDS')
+Indicator.Species$sign
+```
+
+```{r Extract data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+Indicator.Species <- readRDS("Indicator.Species.RDS")
+#extract table of stats
+indisp.sign <- as.data.table(Indicator.Species$sign, keep.rownames=TRUE)
+#add adjusted p-value
+indisp.sign[ ,p.value.bh:=p.adjust(p.value, method="BH")]
+#now can select only the indicators with adjusted significant p-values
+indisp.sign[p.value.bh<=0.05, ]
+head(indisp.sign)
+indisp.sign.df<-as.data.frame(indisp.sign)
+write_csv(as.data.frame(indisp.sign.df), "indisp.sign.df.csv");
+#dat.multipatt.summary<-capture.output(summary(indisp.sign, indvalcomp=TRUE))
+summary(Indicator.Species, indvalcomp=TRUE)
+```
+
+```{r Load back in data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+asv_rarefy30k_long <- read_csv("asv_rarefy30k_long.csv")
+sample_data <- read_csv('SMD.csv')
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Statistics_Output")
+Indicator_Species <- read_csv("indisp.sign.df.csv")
+
+```
+
+```{r Indicator species: Average and RA}
+Indicator_Species_J <- Indicator_Species   %>% rename(FGID = rn) %>% left_join(asv_rarefy30k_long) %>% left_join(sample_data)
+Indicator_Average   <- Indicator_Species_J %>% unite('FGID.Location', c(FGID, Location), remove=F, sep='_')
+Indicator_Average   <- Indicator_Average   %>% group_by(FGID.Location) %>% mutate(Abundance_Vegan_Mean=mean(Abundance_Vegan_Rarefied))
+Indicator_Average   <- Indicator_Average   %>% distinct(FGID.Location, .keep_all = TRUE)
+Indicator_Average   <- Indicator_Average   %>% group_by(Location) %>% mutate(Total_Mean = sum(Abundance_Vegan_Mean))
+Indicator_Average   <- Indicator_Average   %>% group_by(Location) %>% mutate(RA = (Abundance_Vegan_Mean/Total_Mean)*100)
+check               <- Indicator_Average   %>% group_by(Location) %>% summarise(Check=sum(RA))
+```
+
+```{r Filter North and South}
+North_Ind       <- Indicator_Average %>% filter(!s.1 < 1) %>% filter(!p.value.bh > 0.05)
+North_Ind       <- North_Ind %>% group_by(FGID) %>% mutate(Total_RA = mean(RA))
+North_Ind_List  <- North_Ind %>% group_by(FGID) %>% distinct(FGID, .keep_all = TRUE) %>% select(FGID,Total_RA)
+South_Ind       <- Indicator_Average %>% filter(!s.2 < 1) %>% filter(!p.value.bh > 0.05)
+South_Ind       <- South_Ind %>% group_by(FGID) %>% mutate(Total_RA = mean(RA))
+South_Ind_List  <- South_Ind %>% group_by(FGID) %>% distinct(FGID, .keep_all = TRUE) %>% select(FGID,Total_RA)
+```
+
+```{r Filter out Vibrios}
+North_Ind_Vibrios <- North.Ind.Sp.taxa.avg %>% filter(Genus == ("Vibrio"))
+North_Ind_Vibrios_List <- North_Ind_Vibrios %>% distinct(ASV, .keep_all = TRUE) %>% group_by(Kingdom) %>% mutate(Total = sum (ASV.Percentage.Ind))  
+North_Ind_Vibrios_List <- North_Ind_Vibrios_List  %>% dplyr::select(Kingdom,Genus,Species,ASV,ASV.Percentage.Ind)
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+write_csv(North_Ind_Vibrios_List, "North_Ind_Vibrios_List.csv")
+```
+
+```{r Plot North}
+df.mean.D.top <- North.Ind.Sp.taxa.avg %>% filter(!RA < 0)
+df.mean.distinct <- df.mean.D.top %>% distinct(ASV, .keep_all = TRUE)
+
+North.Ind.Sp.taxa.avg <- asv_rarefy30k_long  %>% left_join(df.mean.distinct)
+
+Top75RA.Indsp.bp <- North.Ind.Sp.taxa.avg %>% ggplot(aes(x=Location, y=Avg.RA, fill=(Genus))) +
+  geom_bar(stat='identity', colour = 'black') +
+  guides(fill = guide_legend(ncol=3)) +
+  labs( x= 'Location', y= 'Relative Abundance') +
+  NathanTheme
+  #scale_x_discrete(limits =(locations))
+Top75RA.Indsp.bp
+```
+
+```{r Filter out South sites and investigate}
+South_Ind  <- Indicator_Species %>% filter(!s.2 < 1) %>% filter(!p.value.bh > 0.05) %>% rename(FGID = rn) %>% left_join(asv_rarefy30k_long) %>% left_join(sample_data)
+South_Ind <- South_Ind %>% filter(mycl450 %in% ("1"))
+South_Ind <- South_Ind %>% group_by(Kingdom) %>% mutate(Total.Abundance = sum(Abundance_Vegan_Rarefied))
+South_Ind <- South_Ind %>% group_by(ASV) %>% mutate(Total.ASV.Abundance = sum(Abundance_Vegan_Rarefied))
+South_Ind_Avg <- South_Ind %>% distinct(ASV, .keep_all = TRUE) %>% group_by(ASV) %>% mutate(ASV.Percentage.Ind = sum(Total.ASV.Abundance/Total.Abundance*100))
+```
+
+```{r Filter out Vibrios}
+South_Ind_Vibrios <- South_Ind_Avg %>% filter(Genus == ("Vibrio"))
+South_Ind_Vibrios_List <- South_Ind_Vibrios %>% distinct(ASV, .keep_all = TRUE) %>% group_by(Kingdom) %>% mutate(Total = sum (ASV.Percentage.Ind))  
+South_Ind_Vibrios_List <- South_Ind_Vibrios_List  %>% dplyr::select(Kingdom,Genus,Species,ASV,ASV.Percentage.Ind)
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+write_csv(South_Ind_Vibrios_List, "South_Ind_Vibrios_List.csv")
+```
+
+
+

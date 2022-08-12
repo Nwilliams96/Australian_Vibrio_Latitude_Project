@@ -1,0 +1,178 @@
+---
+title: "Lat_Phyloseq Object"
+Author: Nathan Williams
+Correspondance: nathanwilliams22@gmail.com
+---
+
+```{r Phylo object}
+library("phyloseq")
+library("gridExtra")
+library("vegan")
+library("metacoder")
+library("taxa")
+library("phyloseq")
+library("ggplot2")
+library("dplyr")
+library("readr")
+library("stringr")
+library("agricolae")
+library("ape")
+library("tidyverse")
+library("tidyr")
+library("ggpubr")
+library("metagMisc")
+library("microbiome")
+```
+
+```{r}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+sample_data <- read_csv('SMD.csv')
+asv_rarefied_long <- read_csv('asv_rarefy30k_long.csv')
+```
+
+```{r pw.adonis}
+source('~/Dropbox/UTS/PhD/Projects/Chapter2_RoseBay/Data_Analysis/16S/Scripts/Pairwise.Adonis.r')
+```
+
+```{r Nathan Theme}
+NathanTheme <- list(   #scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+```
+
+```{r Join Latitude and Location}
+
+```
+
+```{r Make Abundance dataframe for Phyloseq}
+abund.vars <- c('ASV_name', 'SampleID', "Abundance_Vegan_Rarefied")
+Abundance <- asv_rarefied_long %>% dplyr::select(abund.vars) %>% distinct()
+Abundance.spread <- Abundance %>% spread(key='SampleID', value='Abundance_Vegan_Rarefied', fill=0)
+Abundance.spread2 <- Abundance.spread %>% dplyr::select(-ASV_name)
+Abundance.spread <- as.data.frame(Abundance.spread)
+rownames(Abundance.spread2) <- Abundance.spread[,1]
+Abundance.spread2 <- as.data.frame(Abundance.spread2)
+```
+
+```{r Make Taxonomy dataframe for Phyloseq}
+taxonomy.vars <- c('ASV_name', 'Kingdom', 'Phylum', 'Class','Order','Family', 'Genus', 'Species','FGID', 'ASV')
+taxonomy <- asv_rarefied_long %>% dplyr::select(taxonomy.vars) %>% distinct()
+taxonomy <- as.data.frame(taxonomy)
+taxonomy2 <- data.frame(taxonomy[,-1], row.names=taxonomy[,1])
+
+taxonomy <- asv_rarefied_long %>% ungroup() %>% dplyr::select(c('ASV_name', 'Kingdom', 'Phylum', 'Class','Order','Family', 'Genus', 'Species'))
+taxonomy<- distinct(taxonomy) #make your list distinct
+rownames(taxonomy) <- paste0(taxonomy$ASV_name) #these row names have to match whatever is in your Abundance table (so it could be ASVid or FGID whatever you want)
+tax<-as.matrix(taxonomy)
+```
+
+```{r Make Sample Data dataframe for Phyloseq}
+sample.vars <- c("SampleID","Location","Koppen_Classification","Type","Latitude","mycl450")
+vars <- sample_data[sample.vars]
+vars <- distinct(vars)
+rownames(vars) <- vars$SampleID
+sampledata <- sample_data(data.frame(vars))
+
+```
+
+```{r Make the objs for phlyo obj}
+OTU = otu_table(Abundance.spread2, taxa_are_rows = TRUE)
+TAX = tax_table(as.matrix(tax))
+sam_data <- sampledata
+```
+
+```{r Make phylo object}
+physeq = phyloseq(OTU, TAX, sam_data)
+colnames(tax_table(physeq))
+```
+
+```{R Subset phyloseq object}
+Beach <- subset_samples(physeq, Type == "Beach")
+River <- subset_samples(physeq, Type == "River")
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Shannon}
+Koppen_classificationPlot <- plot_richness(physeq, x="Latitude", color = "Koppen_Classification", measures=c("Shannon")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot
+```
+
+```{r Alpha Diversity - All.Richness_Koppen_Shannon}
+All.Richness_Koppen_Shannon <- estimate_richness(physeq, split = TRUE, measures = c("Shannon"))
+All.Adonis.Shannon <- adonis(All.Richness_Koppen_Shannon ~ sample_data(physeq)$Location, p.adjust.m = "bonferroni")
+All.Adonis.Shannon
+All.pwAdonis.Shannon <- pairwise.adonis(All.Richness_Koppen_Shannon, sample_data(physeq)$Location, p.adjust.m = "bonferroni")
+All.pwAdonis.Shannon
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Chao1}
+Koppen_classificationPlot <- plot_richness(physeq, x="Latitude", color = "Koppen_Classification", measures=c("Chao1")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot
+
+All.Richness_Koppen_Chao1 <- estimate_richness(physeq, split = TRUE, measures = c("Chao1"))
+All.pwAdonis.Chao1 <- pairwise.adonis(All.Richness_Koppen_Chao1, sample_data(physeq)$Koppen_Classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Chao1
+```
+
+```{R Alpha Diversity - All.Richness_Koppen_Simpson}
+Koppen_classificationPlot <- plot_richness(physeq, x="Location", color = "Koppen_Classification", measures=c("Simpson")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot
+
+All.Richness_Koppen_Simpson <- estimate_richness(physeq, split = TRUE, measures = c("Simpson"))
+All.pwAdonis.Simpson <- pairwise.adonis(All.Richness_Koppen_Simpson, sample_data(physeq)$Koppen_Classification, p.adjust.m = "bonferroni")
+All.pwAdonis.Simpson
+```
+
+```{r Extract richness}
+All.Richness_Koppen_Simpson_df <- as.data.frame(All.Richness_Koppen_Simpson)
+All.Richness_Koppen_Simpson_df <- All.Richness_Koppen_Simpson_df %>% rownames_to_column("SampleID") %>% merge(sample_data, by = "SampleID")
+All.Richness_Koppen_Chao1_df <- as.data.frame(All.Richness_Koppen_Chao1)
+All.Richness_Koppen_Chao1_df <- All.Richness_Koppen_Chao1_df %>% rownames_to_column("SampleID") %>% merge(sample_data, by = "SampleID")
+All.Richness_Koppen_Shannon_df <- as.data.frame(All.Richness_Koppen_Shannon)
+All.Richness_Koppen_Shannon_df <- All.Richness_Koppen_Shannon_df %>% rownames_to_column("SampleID") %>% merge(sample_data, by = "SampleID")
+```
+
+```{r export to csv}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+write.csv(All.Richness_Koppen_Simpson_df, "All.Richness_Koppen_Simpson_df.csv")
+write.csv(All.Richness_Koppen_Chao1_df, "All.Richness_Koppen_Chao1_df.csv")
+write.csv(All.Richness_Koppen_Shannon_df, "All.Richness_Koppen_Shannon_df.csv")
+```
+
+```{r Adonis - mycl450}
+Richness_mycl450 <- estimate_richness(physeq, split = TRUE, measures = c("Simpson"))
+Test1.pwAdonis <- pairwise.adonis(Richness_mycl450, sample_data(physeq)$mycl450, p.adjust.m = "bonferroni")
+Test1.pwAdonis
+```
+
+```{R Alpha Diversity - Koppen_classification}
+Koppen_classificationPlot_Beach <- plot_richness(Beach, x="Latitude", color = "Koppen_Classification", measures=c("Simpson")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_Beach
+```
+
+```{r Export}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Data")
+saveRDS(physeq,"physeq_chloro.RDS")
+```
+
+```{r Adonis - Koppen_classification}
+Richness_Koppen <- estimate_richness(Beach, split = TRUE, measures = c("Simpson"))
+Test1.pwAdonis <- pairwise.adonis(Richness_Koppen, sample_data(Beach)$Koppen_Classification,p.adjust.m = "bonferroni")
+Test1.pwAdonis
+```
+
+```{R Alpha Diversity - Koppen_classification}
+Koppen_classificationPlot_River <- plot_richness(River, x="Latitude", color = "Koppen_Classification", measures=c("Simpson")) + geom_point(size=5, alpha=0.7) + NathanTheme
+Koppen_classificationPlot_River
+```
+
+```{r Adonis - Koppen_classification}
+Richness_Koppen <- estimate_richness(River, split = TRUE, measures = c("Simpson"))
+Test1.pwAdonis <- pairwise.adonis(Richness_Koppen, sample_data(River)$Koppen_Classification,p.adjust.m = "bonferroni")
+Test1.pwAdonis
+```

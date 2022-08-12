@@ -1,0 +1,132 @@
+---
+title: "RBW SIMPER"
+---
+
+```{r SIMPER: Transects}
+library("labdsv")
+library("vegan")
+library("ggplot2")
+library("dplyr")
+library("tidyverse")
+library("tidyr")
+library("clustsig")
+```
+
+```{r Load in Data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+sample_data <- read_csv('SMD.csv')
+HSP60_data_long <- read_csv("HSP60_data_long.csv")
+```
+
+```{r Filter Data}
+sample_data <- sample_data %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+HSP60_data_long <- HSP60_data_long %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+```
+
+```{bash}
+qsub -I -q c3b -l ncpus=11,mem=375GB,walltime=72:00:00 
+qsub -I -l ncpus=11,mem=375GB,walltime=120:00:00
+cd /shared/c3/projects/Nathan.Williams.12034652/Vibrio_Latitude_Project/Vibrio_Latitude_16S_Rerun/fastq_and_analysis/SIMPER
+module load devel/R-current;
+R
+```
+
+```{r Load Data on HPC}
+library("labdsv")
+library("vegan")
+library("ggplot2")
+library("dplyr")
+library("tidyverse")
+library("tidyr")
+library("clustsig")
+
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Data")
+sample_data <- read_csv('SMD_SIMPER.csv')
+HSP60_data_long <- read_csv("HSP60_data_long.csv")
+sample_data <- sample_data %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+HSP60_data_long <- HSP60_data_long %>% filter(!Location == "Cairns B") %>% filter(!Location == "Cairns R")
+```
+
+```{r Arrange}
+Abundance <- HSP60_data_long %>% select(GS, SampleID, RA) %>% distinct()
+Abundance.spread <- Abundance %>% spread(key='SampleID', value='RA', fill=0)
+rownames(sample_data) <- sample_data$SampleID
+L.matrix.simper <-  as.matrix(Abundance.spread[,-c(1)])
+rownames(L.matrix.simper) <- Abundance.spread$GS
+L.matrix.simper.t <- t(L.matrix.simper)
+L.matrix.nz <- L.matrix.simper.t[,colSums(L.matrix.simper.t)!=0]
+```
+
+```{r Run SIMPER}
+simper.L <- simper(L.matrix.nz, group = sample_data$Koppen_classification, permutations = 999);
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Statistics_Output")
+saveRDS(simper.L, 'simper.L.RDS')
+```
+
+```{r SIMPER: load in simper data}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/HSP60/Statistics_Output")
+simper <- readRDS("simper.L.RDS")
+summary(simper, ordered = TRUE, digits = 3)
+```
+
+```{r}
+summary(simper, ordered = TRUE, digits = 3)
+
+simper_pretty <- simper.pretty(rb.matrix.nz, sample_data, c('Location'), perc_cutoff=0.5, low_cutoff = '0.01', low_val=0.01, 'sigASVcontrib')
+```
+
+```{r}
+simper.pretty = function(x, metrics, interesting, perc_cutoff, low_cutoff, low_val, output_name){
+  library(vegan)
+  #handling otu tables for taxa levels
+  save=list(0)
+  if(grepl("Otu", colnames(x)[1])!=TRUE){
+    #converts output from A.Neumann Taxonomy script
+    save=list(58)
+    x=as.data.frame(t(x))
+    orig_names=colnames(x)
+    new_names=list()
+    l=1
+    for(n in colnames(x)){
+      ifelse((l<10), (colnames(x)[l]=c(paste0('Otu000',c(l)))), (colnames(x)[l]=c(paste0('Otu00',c(l))))) 
+      new_names=append(new_names, colnames(x)[l])
+      l=l+1
+    }
+    orig_names=as.data.frame(orig_names, row.names = as.character(new_names))
+  }
+  #running simper
+  for(variables in interesting){
+    test_1=with(metrics, simper(x, metrics[[variables]]))
+    #parsing through simper output, saving desired info to table
+    for(name in names(test_1)){
+      testmx=matrix(ncol=length(interesting))
+      testmx=cbind(test_1[[name]]$ord,test_1[[name]]$cusum)
+      sorted=testmx[order(testmx[,1]),]
+      sorted=cbind(sorted,test_1[[name]]$species)
+      sorted=sorted[order(sorted[,2]),]
+      t=matrix(sorted[sorted[,2]<=perc_cutoff,],ncol=3)
+      i=nrow(t)
+      #converting percents to percent of whole
+      while(i>1){
+        t[i,2]=as.character(as.numeric(t[i,2])-as.numeric(t[i-1,2]))
+        i=i-1
+      }
+      t[,1]=name
+      write.table(t,file=paste(output_name,'_simper.csv',sep=""), append=TRUE, sep=",", col.names = FALSE)
+    }}
+  y=read.table(paste(output_name,'_simper.csv',sep=""), header=FALSE,sep=",",fill = TRUE,row.names = NULL)
+  file.remove(paste(output_name,'_simper.csv',sep = ""))
+  y=y[-c(1)]
+  colnames(y) = c("Comparison", "SIMPER", "OTU")
+  #removing results lower than low cutoff
+  if(low_cutoff=='y'){
+    y=y[!(as.numeric(as.character(y$SIMPER))<low_val),]
+  }
+  #prevents changing of colnames if OTU table
+  if(58 %in% save){
+    y$OTU=orig_names[match(y$OTU, rownames(orig_names)),1]
+  }
+  write.csv(y,file=paste(output_name,'_clean_simper.csv', sep=''))
+}
+
+```

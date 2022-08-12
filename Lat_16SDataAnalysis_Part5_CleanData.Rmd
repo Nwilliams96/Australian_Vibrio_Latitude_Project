@@ -1,0 +1,251 @@
+---
+title: "This code is for the analysis of 16S Sequencing Data from a latitudinal study along the Eastern Coast of Australia"
+author: "Nathan Williams"
+date: "22/10/2020"
+output: html_document
+---
+
+```{r Libraries}
+#0.1 Set working directory
+setwd("~/Dropbox/UTS/PhD/Projects/Vibrio_latitude_study/Data/16S/Run 2/Phyloseq")
+
+#0.2 Load dependencies
+library("gridExtra")
+library("vegan")
+library("metacoder")
+library("taxa")
+library("phyloseq")
+library("ggplot2")
+library("dplyr")
+library("readr")
+library("stringr")
+library("agricolae")
+library("ape")
+library("tidyverse")
+library("tidyr")
+library("ggpubr")
+library("metagMisc")
+library("microbiome")
+```
+
+```{r Asthetics}
+#Locations in order for the figures
+locations <- c("Darwin B", "Darwin R","Cooktown B", "Cooktown R","Cairns B","Cairns R","Townsville B","Townsville R", "Mackay B", "Mackay R","Rockhampton B1","Rockhampton B2","Bundaberg R1","Bundaberg R2","Gold Coast B", "Gold Coast R", "Coffs Harbour B", "Coffs Harbour R", "Port Macquire B", "Port Macquire R", "Sydney B", "Sydney R","Jervis Bay B", "Jervis Bay R","Merimbala B", "Merimbala R", "Hobart B","Hobart R")
+
+LN2 <- c("Darwin B", "Darwin R","Cairns B","Cairns R","Mackay B","Bundaberg R2","Gold Coast R","Sydney B")
+
+LN1 <- c("Cooktown B", "Cooktown R","Townsville B","Townsville R", "Mackay R","Rockhampton B1","Rockhampton B2","Bundaberg R1","Gold Coast B")
+
+LS <- c("Coffs Harbour B", "Coffs Harbour R", "Port Macquire B", "Port Macquire R", "Sydney R","Jervis Bay B", "Jervis Bay R","Merimbala B", "Merimbala R", "Hobart B","Hobart R")
+
+location_Replicates <- c("Darwin B_1","Darwin B_2","Darwin B_3","Darwin R_1","Darwin R_2","Darwin R_3","Cooktown B_1","Cooktown B_2","Cooktown B_3","Cooktown R_1","Cooktown R_2","Cooktown R_3","Cairns B_1","Cairns B_2","Cairns B_3","Cairns R_1","Cairns R_2","Cairns R_3","Townsville B_1","Townsville B_2","Townsville B_3","Townsville R_1", "Townsville R_2","Townsville R_3","Mackay B_1","Mackay B_2","Mackay B_3","Mackay R_1","Mackay R_2","Mackay R_3","Rockhampton B1_1","Rockhampton B1_2","Rockhampton B1_3","Rockhampton B2_1","Rockhampton B2_2","Rockhampton B2_3","Bundaberg R1_1","Bundaberg R1_2","Bundaberg R1_3","Bundaberg R2_1","Bundaberg R2_2","Bundaberg R2_3","Gold Coast B_1","Gold Coast B_2","Gold Coast B_3","Gold Coast R_1","Gold Coast R_2","Gold Coast R_3","Coffs Harbour R_1","Coffs Harbour R_2","Coffs Harbour R_3","Coffs Harbour B_1","Coffs Harbour B_2","Coffs Harbour B_3","Port Macquire B_1","Port Macquire B_2","Port Macquire B_3","Port Macquire R_1","Port Macquire R_2","Port Macquire R_3","Sydney R_1","Sydney R_2","Sydney R_3","Sydney B_1","Sydney B_2","Sydney B_3","Jervis Bay B_1","Jervis Bay B_2","Jervis Bay B_3","Jervis Bay R_1","Jervis Bay R_2","Jervis Bay R_3","Merimbala R_1","Merimbala R_2","Merimbala R_3","Merimbala B_1","Merimbala B_2","Merimbala B_3","Hobart B_1","Hobart B_2","Hobart B_3","Hobart R_1","Hobart R_2","Hobart R_3")
+
+Koppen <- c("Tropical","SubTropical","Temperate")
+
+#Different colours for the figures later
+
+C21 <- c("#cfd5b8","#eb90b5","#84f0ce","#fdbefe","#7fbd82","#63bbfa","#d5b871","#57efff","#f5968e","#94fff1","#e49a7e","#6bcfa9","#ffb6ba","#b2ecac","#bfd0ff","#dfdb8e","#9cd4ff","#ffc38e","#89b1ca","#d6f1a6","#caa0b5","#faffd7","#ffd8ef","#8ab694","#ffcfce","#a1b189","#dbffe9","#cea472","#b1d3c2","#ffe5ad")
+
+C30 <- c("#ffc7d4","#3eccc1","#ea95c3","#b6efae","#eaa0d8","#e2efa1","#95aef5","#c1bc71","#4bb7f1","#ffefaf","#bba0df","#a3b86f","#f5cdff","#8eb77a","#ffbde9","#6fba99", "#e4988d","#ffcec3","#5abab9","#c2a0c8","#c3ffd6","#bbc8ff","#a4b08a","#a7d1ff","#ffe1c3","#98fffd","#a8aac6","#a4ffe9","#eaffdc")
+  
+
+#Theme for plot
+NathanTheme1 <- list(  #scale_x_discrete(limits=(locations)),
+                       theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+
+NathanTheme2 <- list(  theme(axis.title.x = element_text(vjust = 0, hjust = 0.5, size = 16)),
+                       theme(axis.title.y = element_text(vjust = 1, hjust = 0.5, size = 16)),
+                       theme(axis.text=element_text(size=10)),
+                       theme(axis.text.x = element_text(hjust=1, size = 14, angle = 90)),
+                       theme(axis.text.y = element_text(hjust=1, size = 14, angle = 0)),
+                       theme(panel.border = element_blank(), panel.grid.major = element_blank(), 
+                             panel.background = element_blank(),panel.grid.minor = element_blank(), 
+                             axis.line = element_line(colour = 'black')))
+```
+
+```{r Load and prepare files}
+#0.1 Set working directory
+setwd("~/Dropbox/UTS/PhD/Projects/Vibrio_latitude_study/Data/16S/Run 2/Data")
+#1.1 load in the data
+asv_data <- read_csv("ASV_table.csv")
+sample_data <- read_csv('SMD.csv')
+
+#1.2 "select" your columns and then "spread" the data 
+asv_data <- asv_data %>% select(ASV,code2,abund_chim1)
+asv_data <- asv_data %>% rename(SampleID = code2)
+asv_data <- asv_data %>% rename(Abundance = abund_chim1)
+asv_data <-asv_data %>% spread(key='SampleID', value='Abundance', fill=0)
+names(asv_data) = gsub(pattern = "p1;", replacement = "", x = names(asv_data))
+ 
+
+#1.3 Load in the taxa data
+tax.silva <- read_csv("Tax_silva.csv")
+tax.species <- read_csv("Tax_species.csv")
+
+#1.4 Left join your tax.silva(Kingdom,Phylum,Class,Order,Genus) to your tax.species (Genus,Species)
+tax_data  <- tax.silva  %>% left_join(tax.species, 'ASV')
+```
+
+```{r Clean the data}
+setwd("~/Dropbox/UTS/PhD/Projects/Vibrio_latitude_study/Data/16S/Run 2/Data")
+#3.1 Set your threshold and remove your bootstrap of 20 and replace it with 49, this is the first step towards cleaning your data.
+mythreshold <- 49
+tax_data$tax.Kingdom <- ifelse(tax_data$boot.Kingdom <= mythreshold, NA, tax_data$tax.Kingdom)
+tax_data$tax.Phylum <- ifelse(tax_data$boot.Phylum <= mythreshold, NA, tax_data$tax.Phylum)
+tax_data$tax.Class <- ifelse(tax_data$boot.Class <= mythreshold, NA, tax_data$tax.Class)
+tax_data$tax.Order <- ifelse(tax_data$boot.Order <= mythreshold, NA, tax_data$tax.Order)
+tax_data$tax.Family <- ifelse(tax_data$boot.Family <= mythreshold, NA, tax_data$tax.Family)
+tax_data$tax.Genus <- ifelse(tax_data$boot.Genus <= mythreshold, NA, tax_data$tax.Genus)
+tax_data$tax.Kingdom <- forcats::fct_explicit_na(tax_data$tax.Kingdom, 'k_unassigned')
+tax_data$tax.Phylum <- forcats::fct_explicit_na(tax_data$tax.Phylum, 'p_unassigned')
+tax_data$tax.Class <- forcats::fct_explicit_na(tax_data$tax.Class, 'c_unassigned')
+tax_data$tax.Order <- forcats::fct_explicit_na(tax_data$tax.Order, 'o_unassigned')
+tax_data$tax.Family <- forcats::fct_explicit_na(tax_data$tax.Family, 'f_unassigned')
+tax_data$Genus <- forcats::fct_explicit_na(tax_data$Genus, 'g_unassigned')
+tax_data$Species <- forcats::fct_explicit_na(tax_data$Species, 'sp.')
+
+#3.2 Select the columns you want and ditch the rest
+tax_data <- tax_data %>% select(ASV,tax.Kingdom,tax.Phylum,tax.Order,tax.Family,tax.Class,Genus,Species)
+
+#3.3 Rename columns (I do this to be neat but you don't have to)
+tax_data <- tax_data %>% rename(Kingdom = tax.Kingdom)
+tax_data <- tax_data %>% rename(Phylum = tax.Phylum)
+tax_data <- tax_data %>% rename(Class = tax.Class)
+tax_data <- tax_data %>% rename(Order = tax.Order)
+tax_data <- tax_data %>% rename(Family = tax.Family)
+
+#3.4 Left join taxonomy data and ASV data to keep things simple
+tax_data$ASV <- as.character(tax_data$ASV) # Must be same type for join to work
+asv_data$ASV <- as.character(asv_data$ASV) # Must be same type for join to work
+asv_data <- left_join(asv_data, tax_data,
+                      by = c("ASV" = "ASV")) # Vdentifies cols with shared IDs
+#print(asv_data)
+
+#3.5 Load in metadata
+
+#3.6 Make a long version of your data
+asv_data_long <- gather(data = asv_data, key = SampleID, value = Abundance, -c(1,92,93,94,95,96,97,98))
+
+#3.7 Left join your sample_data
+asv_data_long <- asv_data_long %>% left_join(sample_data)
+
+#3.8 Remove unwanted ASVs - we will then store them in "Discarded_ASVs" in the case you want them later on.For this step we are going to rename our asv_data_long to Remove_1, Remove_2 and so on.. We will then label the final long ASV table as asv_cleaned_long.
+table(asv_data_long$Kingdom)
+
+#3.8.1 Remove Archaea... 29602 ASVs total in the dataset (present >1 time ever)
+Remove_1 <- asv_data_long %>% filter(!Kingdom %in% c('Archaea'))
+Archaea <- asv_data_long %>% filter(Kingdom %in% c('Archaea'))
+
+#3.8.2 Remove Eukaryota
+Remove_2 <- Remove_1 %>% filter(!Kingdom %in% c('Eukaryota'))
+Eukaryota <- Remove_1 %>% filter(Kingdom %in% c('Eukaryota'))
+
+#3.8.3 Remove Unassigned ASVs 
+Remove_3 <- Remove_2 %>% filter(!Kingdom %in% c('k_unassigned'))
+Unassigned_ASVs <- Remove_2 %>% filter(Kingdom %in% c('k_unassigned'))
+
+#3.8.4 Remove Chloroplast
+Remove_4 <- Remove_3 %>% filter(!Order %in% c('Chloroplast'))
+Chloroplast <- Remove_3 %>% filter(Order %in% c('Chloroplast'))
+
+#3.8.5 Remove Mitochondria - this is the last step of removals so rather than labelling "Remove_5" we are going for asv_clean_long
+asv_cleaned_long <- Remove_4 %>% filter(!Family %in% c('Mitochondria'))
+Mitochondria <- Remove_4 %>% filter(Order %in% c("Mitochondria"))
+
+#3.8.6 Make a table to check everything has been removed
+table(asv_cleaned_long$Kingdom)
+
+#3.8.7 Make a dataframe for your stored Discarded ASVS "Discared_ASVs"
+Discarded_ASVS<-rbind(Archaea,Eukaryota,Chloroplast)
+
+#3.8.8 Remove any unwanted samples. In this case I'm removing some weird samples that aren't mine
+asv_cleaned_long <- asv_cleaned_long %>% filter(!SampleID %in% c('25','26','27','28','29','30'))
+
+#3.9 Quality filtration - theres a nature paper - basically you are removing anything that has a relative abundance of below 0.05%
+asv_cleaned_long <- asv_cleaned_long %>%  arrange(desc(asv_cleaned_long$Abundance))
+
+#3.9.1 Make your No_Filter table
+No_Filter <- asv_cleaned_long  %>% filter(Abundance > 0)
+
+#3.9.2 Calculate sample total column and left join back to No_Filter, this will now be called No_Filter_Total
+Sample_Total <- No_Filter  %>% group_by(SampleID) %>% summarise(Total=sum(Abundance))
+No_Filter_Total <- No_Filter %>% left_join(Sample_Total, c("SampleID"="SampleID"))
+
+#3.9.3 We will then calculate the relative abundance and remove the bottom 0.05%. Once this is done we will relable it asv_cleaned_long as we are done
+No_Filter_Total$PercT <- ((No_Filter_Total$Abundance)/No_Filter_Total$Total)*100 #this makes it into a %
+No_Filter_Total <- No_Filter_Total %>%  arrange(desc(No_Filter_Total$PercT))
+asv_cleaned_long <- No_Filter_Total  %>% filter(PercT > 0.005)
+
+#3.9.4 Store your filtered out ASVs incase you want to peak at them later on
+Filtered_ASVs_0.05 <- No_Filter_Total  %>% filter(PercT < 0.005)
+
+#3.9.5 Select the columns we want or aka delete those columns we created before. We cannot use that old relative abundance column, we must calculate a new RA based off of our now cleaned data set.
+asv_cleaned_long <- asv_cleaned_long %>% select(ASV,Kingdom,Phylum,Order,Family,Class,Genus,Species,SampleID,Abundance,Location,`Koppen`,`Lat DD`,Location_Rep,Type)
+
+#3.9.6 Now we will name the ASVs
+asv_cleaned_long_name <- asv_cleaned_long %>% filter(!Abundance %in% c("0"))
+asv_cleaned_long <- asv_cleaned_long_name %>%  arrange(desc(asv_cleaned_long_name$Abundance))
+asv_cleaned_by_asv <- asv_cleaned_long %>%group_by(ASV)
+ASV_list <- asv_cleaned_by_asv %>% dplyr::select (ASV)
+ASV_list <-distinct(ASV_list)
+ASV_list$numbers<-seq(1000000001,1000000000+nrow(ASV_list),1)
+ASV_list$prefix<-rep('B',nrow(ASV_list))
+ASV_list <- ASV_list %>% unite(ASV_name, c('prefix','numbers'), sep='', remove=T)
+asv_cleaned_long <- asv_cleaned_long %>% left_join(ASV_list , c("ASV"="ASV"))
+asv_cleaned_long <- asv_cleaned_long %>% unite('FG', c(Family, Genus), remove=F, sep=';')
+asv_cleaned_long <- asv_cleaned_long %>% unite('FGSp', c(FG, Species), remove=F, sep=';')
+asv_cleaned_long <- asv_cleaned_long %>% unite('FGID', c(FGSp, ASV_name), remove=F, sep=';')
+asv_cleaned_long <- asv_cleaned_long %>% unite('GSID', c(Genus, Species, ASV_name), remove=F, sep=';')
+asv_cleaned_long <- asv_cleaned_long %>% unite('FGID.Location', c(FGID, Location), remove=F, sep=';')
+asv_cleaned_long <- asv_cleaned_long %>% unite('taxonomy', c(Kingdom,Phylum,Class,Order,Family,Genus,Species), remove=F, sep=';')
+
+write_csv(asv_cleaned_long, "asv_cleaned_long.csv")
+```
+
+```{r Normalise the unrarefied data}
+setwd("~/Dropbox/UTS/PhD/Projects/Vibrio_latitude_study/Data/16S/Run 2/Phyloseq")
+asv_cleaned_long <- read_csv("asv_cleaned_long.csv")
+sample_data <- read_csv('SMD.csv')
+
+#4.1 Make a column for FGID.Location Total and then left join. Next select only the distinct valaues (FGID.Location)
+#4.1.1 Make FGID.Location
+TL <- asv_cleaned_long %>% group_by(FGID.Location) %>% summarise(Total.Location = sum(Abundance))
+#4.1.2 Left join
+asv_cleaned_long <- asv_cleaned_long %>% left_join(TL)
+#4.1.3 select only the distinct values (FGID.Location)
+asv_long_normalised <- asv_cleaned_long %>% distinct(FGID.Location, .keep_all = TRUE)
+
+#4.2 Make a column for the total bacterial ASVs per location, left join and then calculate the RA by dividing FGID.Location/ASVs per location *100
+#4.2.1 Make a column for the total bacterial ASVs per location
+TBL <- asv_cleaned_long %>% group_by(Kingdom,Location) %>% summarise(Total.Bacteria.Location = sum(Abundance))
+#4.2.2 Left join
+asv_long_normalised <- asv_long_normalised %>% left_join(TBL)
+#4.2.3 Calculate the RA by dividing FGID.Location/ASVs per location *100
+asv_long_normalised <- asv_long_normalised %>% mutate(RA = (Total.Location/Total.Bacteria.Location)*100)
+#4.2.4 Create Count_Location to add the RA for each location (should add to 100).
+Count_Location <- asv_long_normalised %>% group_by(Location) %>% summarise(Total = sum(RA))
+#4.2.5 Another good check is to just make sure by Kingdom that all your AVS are there (This will plot all the ASVs, it will take some time to load)
+Kingdom_Check <- asv_long_normalised %>% ggplot(aes(x=Location, y=RA, fill=(Kingdom))) + 
+  geom_bar(stat='identity') +
+  labs( x= 'Location', y= 'Relative Abundance') +
+  NathanTheme1
+Kingdom_Check
+```
+
+```{R Label SampleID}
+setwd("~/Dropbox/UTS/PhD/Projects/Chapter1_Vibrio_latitude_study/Data/16S/Run 2/Data")
+sample_data <- read_csv('SMD.csv')
+
+sample_data$SampleID <- paste0("L", sample_data$SampleID)
+
+write_csv(sample_data, "SMD.csv")
+```
+
+
